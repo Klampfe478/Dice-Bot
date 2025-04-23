@@ -1,2 +1,1 @@
-# Dice-Bot
-Dice Bot for Discord
+# Mein Projekt

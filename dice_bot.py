@@ -26,14 +26,19 @@ def init_sheets_client():
         raise RuntimeError("SHEET_ID fehlt")
 
     sh = gc.open_by_key(sheet_id)
-    return sh.sheet1
+    sheet = sh.sheet1
+
+    # 🧼 Header prüfen und ggf. setzen
+    if sheet.row_count == 0 or not sheet.get_all_values():
+        sheet.append_row(["user_id", "username", "datum", "zeitstempel", "wert"])
+    return sheet
 
 # Bot-Token aus der Umgebungsvariable laden
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 if not TOKEN:
     raise RuntimeError("Fehler: DISCORD_BOT_TOKEN Umgebungsvariable nicht gesetzt")
 
-# JSON-Datei für Persistenz
+# JSON-Datei für Persistenz (veraltet)
 data_file = 'dice_data.json'
 
 # Intents konfigurieren
@@ -42,55 +47,11 @@ intents.message_content = True
 
 # Bot initialisieren
 bot = commands.Bot(command_prefix='!', intents=intents)
+sheet = init_sheets_client()
 
-# Speicher für Datum des letzten Wurfs pro User und alle Roll-Records
-last_rolls: dict[int, datetime.date] = {}
-roll_records: list[dict] = []  # Elemente: {'user_id': int, 'timestamp': datetime.datetime, 'result': int}
-
-# Hilfsfunktionen für Persistenz
-def load_data():
-    global last_rolls, roll_records
-    if not os.path.isfile(data_file) or os.path.getsize(data_file) == 0:
-        return
-    try:
-        with open(data_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        last_rolls = {int(uid): datetime.date.fromisoformat(ds)
-                      for uid, ds in data.get('last_rolls', {}).items()}
-        roll_records = [
-            {
-                'user_id': rec['user_id'],
-                'timestamp': datetime.datetime.fromisoformat(rec['timestamp']),
-                'result': rec['result']
-            }
-            for rec in data.get('roll_records', [])
-            if all(k in rec for k in ('user_id', 'timestamp', 'result'))
-        ]
-    except Exception as e:
-        print(f'Persistenz: Fehler beim Laden ({e}), starte mit leerem Datensatz')
-
-
-def save_data():
-    data = {
-        'last_rolls': {str(uid): d.isoformat() for uid, d in last_rolls.items()},
-        'roll_records': [
-            {'user_id': r['user_id'], 'timestamp': r['timestamp'].isoformat(), 'result': r['result']}
-            for r in roll_records
-        ]
-    }
-    try:
-        with open(data_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f'Fehler beim Speichern der Daten: {e}')
-
-# Bot-Events und Commands
 @bot.event
 async def on_ready():
-    load_data()
     print(f'Bot eingeloggt als {bot.user.name} (ID: {bot.user.id})')
-
-sheet = init_sheets_client()
 
 @bot.command(name='roll')
 async def roll(ctx):
@@ -183,9 +144,22 @@ async def command_list(ctx):
         "**Verfügbare Commands:**\n"
         "• `!roll` – Würfelt eine zufällige Zahl zwischen 0 und 100.\n"
         "• `!top today` – Zeigt die Top-Würfe des Tages.\n"
-        "• `!top all` – Zeigt die Top-Würfe des Monats."    
+        "• `!top all` – Zeigt die Top-Würfe des Monats."
     )
     await ctx.send(help_text)
+
+@bot.command(name='backup')
+async def backup_sheet(ctx):
+    try:
+        gc = sheet.spreadsheet.client
+        original = sheet.spreadsheet
+        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
+        new_title = f"Backup_{original.title}_{timestamp}"
+        backup_copy = gc.copy(original.id, title=new_title)
+        await ctx.send(f"✅ Backup erstellt: `{new_title}`")
+    except Exception as e:
+        print("Fehler beim Backup:", e)
+        await ctx.send("⚠️ Backup fehlgeschlagen.")
 
 async def start_webserver():
     async def handle(request):
@@ -209,7 +183,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-    if not TOKEN:
-        print('Fehler: DISCORD_BOT_TOKEN Umgebungsvariable nicht gesetzt')
-    else:
-        bot.run(TOKEN)

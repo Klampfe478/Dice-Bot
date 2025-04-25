@@ -7,7 +7,7 @@ import random
 from dotenv import load_dotenv
 load_dotenv(dotenv_path='Discord_Bot_Token.env')
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -52,6 +52,7 @@ sheet = init_sheets_client()
 @bot.event
 async def on_ready():
     print(f'Bot eingeloggt als {bot.user.name} (ID: {bot.user.id})')
+    auto_backup.start()
 
 @bot.command(name='roll')
 async def roll(ctx):
@@ -140,7 +141,8 @@ async def command_list(ctx):
         "**Verfügbare Commands:**\n"
         "• `!roll` – Würfelt eine zufällige Zahl zwischen 0 und 100.\n"
         "• `!top today` – Zeigt die Top-Würfe des Tages.\n"
-        "• `!top all` – Zeigt die Top-Würfe des Monats."
+        "• `!top all` – Zeigt die Top-Würfe des Monats.\n"
+        "• `!backup` – Erstellt manuell ein Backup des Sheets."
     )
     await ctx.send(help_text)
 
@@ -156,6 +158,20 @@ async def backup_sheet(ctx):
     except Exception as e:
         print("Fehler beim Backup:", e)
         await ctx.send("⚠️ Backup fehlgeschlagen.")
+
+@tasks.loop(hours=24)
+async def auto_backup():
+    now = datetime.datetime.utcnow()
+    if now.day == 1:
+        try:
+            gc = sheet.spreadsheet.client
+            original = sheet.spreadsheet
+            timestamp = now.strftime("%Y-%m-%d")
+            new_title = f"AutoBackup_{original.title}_{timestamp}"
+            backup_copy = gc.copy(original.id, title=new_title)
+            print(f"🔁 Automatisches Monatsbackup erstellt: {new_title}")
+        except Exception as e:
+            print("Fehler beim automatischen Backup:", e)
 
 async def start_webserver():
     async def handle(request):

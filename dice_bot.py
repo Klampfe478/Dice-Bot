@@ -8,6 +8,25 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path='Discord_Bot_Token.env')
 import discord
 from discord.ext import commands
+import gspread
+from google.oauth2.service_account import Credentials
+
+def init_sheets_client():
+    creds_raw = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
+    if not creds_raw:
+        raise RuntimeError("GOOGLE_SHEETS_CREDENTIALS fehlt")
+
+    creds_json = json.loads(creds_raw)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
+
+    gc = gspread.authorize(creds)
+    sheet_id = os.environ.get("SHEET_ID")
+    if not sheet_id:
+        raise RuntimeError("SHEET_ID fehlt")
+
+    sh = gc.open_by_key(sheet_id)
+    return sh.sheet1
 
 # Bot-Token aus der Umgebungsvariable laden
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
@@ -70,6 +89,8 @@ def save_data():
 async def on_ready():
     load_data()
     print(f'Bot eingeloggt als {bot.user.name} (ID: {bot.user.id})')
+
+sheet = init_sheets_client()
 
 @bot.command(name='roll')
 async def roll(ctx):

@@ -11,6 +11,9 @@ from discord.ext import commands
 import gspread
 from google.oauth2.service_account import Credentials
 
+_top_command_lock = asyncio.Lock()
+
+
 def init_sheets_client():
     creds_raw = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
     if not creds_raw:
@@ -80,55 +83,56 @@ async def roll(ctx):
 
 @bot.command(name='top')
 async def top(ctx, period: str):
-    now = datetime.datetime.utcnow()
-    try:
-        records = sheet.get_all_records()
-    except Exception as e:
-        await ctx.send("⚠️ Fehler beim Zugriff auf das Google Sheet.")
-        print("Fehler in !top:", e)
-        return
+    async with _top_command_lock:
+        now = datetime.datetime.utcnow()
+        try:
+            records = sheet.get_all_records()
+        except Exception as e:
+            await ctx.send("⚠️ Fehler beim Zugriff auf das Google Sheet.")
+            print("Fehler in !top:", e)
+            return
 
-    if period.lower() == 'today':
-        filtered = [r for r in records if r.get('datum') == str(now.date())]
-        title = 'Top-Würfe des Tages'
-    elif period.lower() == 'all':
-        filtered = [
-            r for r in records
-            if 'zeitstempel' in r and datetime.datetime.fromisoformat(r['zeitstempel']).year == now.year
-            and datetime.datetime.fromisoformat(r['zeitstempel']).month == now.month
-        ]
-        title = 'Top-Würfe des Monats'
-    else:
-        await ctx.send("Ungültiger Zeitraum. Nutze `!top today` oder `!top all`.")
-        return
+        if period.lower() == 'today':
+            filtered = [r for r in records if r.get('datum') == str(now.date())]
+            title = 'Top-Würfe des Tages'
+        elif period.lower() == 'all':
+            filtered = [
+                r for r in records
+                if 'zeitstempel' in r and datetime.datetime.fromisoformat(r['zeitstempel']).year == now.year
+                and datetime.datetime.fromisoformat(r['zeitstempel']).month == now.month
+            ]
+            title = 'Top-Würfe des Monats'
+        else:
+            await ctx.send("Ungültiger Zeitraum. Nutze `!top today` oder `!top all`.")
+            return
 
-    if not filtered:
-        await ctx.send('Noch keine Würfe für diesen Zeitraum.')
-        return
+        if not filtered:
+            await ctx.send('Noch keine Würfe für diesen Zeitraum.')
+            return
 
-    best_per_user = {}
-    for rec in filtered:
-        uid = rec['user_id']
-        wert = rec['wert']
-        if uid not in best_per_user or wert > best_per_user[uid]:
-            best_per_user[uid] = wert
+        best_per_user = {}
+        for rec in filtered:
+            uid = rec['user_id']
+            wert = rec['wert']
+            if uid not in best_per_user or wert > best_per_user[uid]:
+                best_per_user[uid] = wert
 
-    top_n = sorted(
-        [{'user_id': uid, 'result': val} for uid, val in best_per_user.items()],
-        key=lambda x: x['result'],
-        reverse=True
-    )[:10]
+        top_n = sorted(
+            [{'user_id': uid, 'result': val} for uid, val in best_per_user.items()],
+            key=lambda x: x['result'],
+            reverse=True
+        )[:10]
 
-    embed = discord.Embed(title=title, color=discord.Color.blurple(), timestamp=now)
-    embed.set_footer(text="Dice-Game Leaderboard")
-    embed.set_thumbnail(url="attachment://thumbnail.png")
-    file = discord.File('thumbnail.png', filename='thumbnail.png')
+        embed = discord.Embed(title=title, color=discord.Color.blurple(), timestamp=now)
+        embed.set_footer(text="Dice-Game Leaderboard")
+        embed.set_thumbnail(url="attachment://thumbnail.png")
+        file = discord.File('thumbnail.png', filename='thumbnail.png')
 
-    for idx, rec in enumerate(top_n, start=1):
-        user = await bot.fetch_user(int(rec['user_id']))
-        embed.add_field(name=f"{idx}. {user.name}", value=f"{user.mention}: **{rec['result']}**", inline=False)
+        for idx, rec in enumerate(top_n, start=1):
+            user = await bot.fetch_user(int(rec['user_id']))
+            embed.add_field(name=f"{idx}. {user.name}", value=f"{user.mention}: **{rec['result']}**", inline=False)
 
-    await ctx.send(embed=embed, file=file)
+        await ctx.send(embed=embed, file=file)
 
 @bot.command(name='command')
 async def command_list(ctx):

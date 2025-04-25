@@ -73,17 +73,32 @@ async def on_ready():
 
 @bot.command(name='roll')
 async def roll(ctx):
-    user_id = ctx.author.id
+    user_id = str(ctx.author.id)
     now = datetime.datetime.utcnow()
-    today = now.date()
-    if last_rolls.get(user_id) == today:
-        await ctx.send(f"{ctx.author.mention}, du hast heute bereits gewürfelt. Versuch's doch morgen nochmal!")
+    today = str(now.date())
+
+    # Hole nur relevante Spalten
+    try:
+        data = sheet.get_all_values()
+        header = data[0]
+        rows = data[1:]
+    except Exception as e:
+        await ctx.send("Fehler beim Zugriff auf das Google Sheet.")
+        print(e)
         return
 
+    # prüfe ob user_id + today bereits existieren
+    for row in rows:
+        if len(row) >= 3 and row[0] == user_id and row[2] == today:
+            await ctx.send(f"{ctx.author.mention}, du hast heute bereits gewürfelt. Versuch's doch morgen nochmal!")
+            return
+
     result = random.randint(0, 100)
-    last_rolls[user_id] = today
-    roll_records.append({'user_id': user_id, 'timestamp': now, 'result': result})
-    save_data()
+    try:
+        sheet.append_row([user_id, str(ctx.author), today, now.isoformat(), result])
+    except Exception as e:
+        print(f"Fehler beim Schreiben ins Google Sheet: {e}")
+
     await ctx.send(f"{ctx.author.mention} würfelt... 🎲 Ergebnis: **{result}**")
 
 @bot.command(name='top')

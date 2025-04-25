@@ -137,6 +137,17 @@ async def top(ctx, period: str):
 
     await ctx.send(embed=embed, file=file)
 
+@bot.command(name='command')
+async def command_list(ctx):
+    """Liste aller verfügbaren Befehle auf."""
+    commands_text = (
+        "**Verfügbare Befehle:**\n"
+        "• `!roll`: Würfelt eine zufällige Zahl zwischen 0 und 100.\n"
+        "• `!top today`: Zeigt die Top-Würfe des Tages.\n"
+        "• `!top all`: Zeigt die Top-Würfe des Monats.\n"
+    )
+    await ctx.send(commands_text)
+
 async def start_webserver():
     async def handle(request):
         return web.Response(text="OK")

@@ -153,7 +153,7 @@ async def backup_sheet(ctx):
         original = sheet.spreadsheet
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
         new_title = f"Backup_{original.title}_{timestamp}"
-        backup_copy = gc.copy(original.id, title=new_title)
+        gc.copy(original.id, title=new_title)
         await ctx.send(f"✅ Backup erstellt: `{new_title}`")
     except Exception as e:
         print("Fehler beim Backup:", e)
@@ -168,8 +168,22 @@ async def auto_backup():
             original = sheet.spreadsheet
             timestamp = now.strftime("%Y-%m-%d")
             new_title = f"AutoBackup_{original.title}_{timestamp}"
-            backup_copy = gc.copy(original.id, title=new_title)
+            gc.copy(original.id, title=new_title)
             print(f"🔁 Automatisches Monatsbackup erstellt: {new_title}")
+
+            # 📦 Archiv-Tab erstellen
+            sheet_data = sheet.get_all_values()
+            if len(sheet_data) > 1:
+                archive_title = f"Archiv_{now.strftime('%Y_%m')}"
+                archive_sheet = original.add_worksheet(title=archive_title, rows=str(len(sheet_data)), cols="10")
+                archive_sheet.update("A1", sheet_data)
+                print(f"📁 Archiv-Tab erstellt: {archive_title}")
+
+                # Nur Header behalten
+                header = sheet_data[0]
+                sheet.clear()
+                sheet.insert_row(header, index=1)
+                print("🧼 Haupt-Sheet geleert (nur Header behalten).")
         except Exception as e:
             print("Fehler beim automatischen Backup:", e)
 

@@ -5,6 +5,7 @@
 # 3. DISCORD_BOT_TOKEN Umgebungsvariable setzen (z.B. via .env oder Discord_Bot_Token.env)
 # 4. Im Discord Developer Portal: "Privileged Gateway Intents" → "Message Content Intent" aktivieren
 
+
 import os
 import json
 import datetime
@@ -16,8 +17,32 @@ load_dotenv(dotenv_path='Discord_Bot_Token.env')
 import discord
 from discord.ext import commands
 
+import gspread
+from google.oauth2.service_account import Credentials
+
+def init_sheets_client():
+    import json
+    creds_raw = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
+    if not creds_raw:
+        raise RuntimeError("GOOGLE_SHEETS_CREDENTIALS fehlt")
+
+    creds_json = json.loads(creds_raw)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
+
+    gc = gspread.authorize(creds)
+    sheet_id = os.environ.get("SHEET_ID")
+    if not sheet_id:
+        raise RuntimeError("SHEET_ID fehlt")
+    sh = gc.open_by_key(sheet_id)
+    return sh.sheet1  # Zugriff auf erstes Tabellenblatt
+
+sheet = init_sheets_client()
+
 # Bot-Token aus der Umgebungsvariable laden
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+if not TOKEN:
+    raise RuntimeError("Fehler: DISCORD_BOT_TOKEN Umgebungsvariable nicht gesetzt")
 
 # JSON-Datei für Persistenz
 data_file = 'dice_data.json'
@@ -89,6 +114,12 @@ async def roll(ctx):
     last_rolls[user_id] = today
     roll_records.append({'user_id': user_id, 'timestamp': now, 'result': result})
     save_data()
+    # zusätzlich ins Google Sheet schreiben
+    try:
+        sheet.append_row([str(now.date()), str(ctx.author), result])
+    except Exception as e:
+        print(f"Fehler beim Schreiben ins Google Sheet: {e}")
+
     await ctx.send(f"{ctx.author.mention} würfelt... 🎲 Ergebnis: **{result}**")
 
 @bot.command(name='top')

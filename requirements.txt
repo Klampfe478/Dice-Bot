@@ -1,6 +1,5 @@
 discord.py
 python-dotenv
-aiohttp
 gspread
 google-auth
 aiohttp

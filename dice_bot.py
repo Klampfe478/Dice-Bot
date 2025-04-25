@@ -29,8 +29,11 @@ def init_sheets_client():
     sheet = sh.sheet1
 
     # 🧼 Header prüfen und ggf. setzen
-    if sheet.row_count == 0 or not sheet.get_all_values():
-        sheet.append_row(["user_id", "username", "datum", "zeitstempel", "wert"])
+    headers = ["user_id", "username", "datum", "zeitstempel", "wert"]
+    current_values = sheet.get_all_values()
+    if not current_values or current_values[0] != headers:
+        sheet.insert_row(headers, index=1)
+
     return sheet
 
 # Bot-Token aus der Umgebungsvariable laden
@@ -38,14 +41,8 @@ TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 if not TOKEN:
     raise RuntimeError("Fehler: DISCORD_BOT_TOKEN Umgebungsvariable nicht gesetzt")
 
-# JSON-Datei für Persistenz (veraltet)
-data_file = 'dice_data.json'
-
-# Intents konfigurieren
 intents = discord.Intents.default()
 intents.message_content = True
-
-# Bot initialisieren
 bot = commands.Bot(command_prefix='!', intents=intents)
 sheet = init_sheets_client()
 
@@ -59,7 +56,6 @@ async def roll(ctx):
     now = datetime.datetime.utcnow()
     today = str(now.date())
 
-    # Hole nur relevante Spalten
     try:
         data = sheet.get_all_values()
         header = data[0]
@@ -69,7 +65,6 @@ async def roll(ctx):
         print(e)
         return
 
-    # prüfe ob user_id + today bereits existieren
     for row in rows:
         if len(row) >= 3 and row[0] == user_id and row[2] == today:
             await ctx.send(f"{ctx.author.mention}, du hast heute bereits gewürfelt. Versuch's doch morgen nochmal!")
@@ -93,7 +88,6 @@ async def top(ctx, period: str):
         print("Fehler in !top:", e)
         return
 
-    # Filter logik
     if period.lower() == 'today':
         filtered = [r for r in records if r.get('datum') == str(now.date())]
         title = 'Top-Würfe des Tages'
@@ -112,7 +106,6 @@ async def top(ctx, period: str):
         await ctx.send('Noch keine Würfe für diesen Zeitraum.')
         return
 
-    # Nur höchster Wurf pro User
     best_per_user = {}
     for rec in filtered:
         uid = rec['user_id']
@@ -139,7 +132,6 @@ async def top(ctx, period: str):
 
 @bot.command(name='command')
 async def command_list(ctx):
-    """Listet alle verfügbaren Commands auf."""
     help_text = (
         "**Verfügbare Commands:**\n"
         "• `!roll` – Würfelt eine zufällige Zahl zwischen 0 und 100.\n"

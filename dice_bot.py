@@ -104,11 +104,23 @@ async def roll(ctx):
 @bot.command(name='top')
 async def top(ctx, period: str):
     now = datetime.datetime.utcnow()
+    try:
+        records = sheet.get_all_records()
+    except Exception as e:
+        await ctx.send("⚠️ Fehler beim Zugriff auf das Google Sheet.")
+        print("Fehler in !top:", e)
+        return
+
+    # Filter logik
     if period.lower() == 'today':
-        filtered = [r for r in roll_records if r['timestamp'].date() == now.date()]
+        filtered = [r for r in records if r.get('datum') == str(now.date())]
         title = 'Top-Würfe des Tages'
     elif period.lower() == 'all':
-        filtered = [r for r in roll_records if r['timestamp'].year == now.year and r['timestamp'].month == now.month]
+        filtered = [
+            r for r in records
+            if 'zeitstempel' in r and datetime.datetime.fromisoformat(r['zeitstempel']).year == now.year
+            and datetime.datetime.fromisoformat(r['zeitstempel']).month == now.month
+        ]
         title = 'Top-Würfe des Monats'
     else:
         await ctx.send("Ungültiger Zeitraum. Nutze `!top today` oder `!top all`.")
@@ -118,14 +130,19 @@ async def top(ctx, period: str):
         await ctx.send('Noch keine Würfe für diesen Zeitraum.')
         return
 
-    best_per_user: dict[int, int] = {}
+    # Nur höchster Wurf pro User
+    best_per_user = {}
     for rec in filtered:
         uid = rec['user_id']
-        if uid not in best_per_user or rec['result'] > best_per_user[uid]:
-            best_per_user[uid] = rec['result']
+        wert = rec['wert']
+        if uid not in best_per_user or wert > best_per_user[uid]:
+            best_per_user[uid] = wert
 
-    reduced = [{'user_id': uid, 'result': res} for uid, res in best_per_user.items()]
-    top_n = sorted(reduced, key=lambda x: x['result'], reverse=True)[:10]
+    top_n = sorted(
+        [{'user_id': uid, 'result': val} for uid, val in best_per_user.items()],
+        key=lambda x: x['result'],
+        reverse=True
+    )[:10]
 
     embed = discord.Embed(title=title, color=discord.Color.blurple(), timestamp=now)
     embed.set_footer(text="Dice-Game Leaderboard")
@@ -133,9 +150,8 @@ async def top(ctx, period: str):
     file = discord.File('thumbnail.png', filename='thumbnail.png')
 
     for idx, rec in enumerate(top_n, start=1):
-        user = await bot.fetch_user(rec['user_id'])
-        display_name = user.name
-        embed.add_field(name=f"{idx}. {display_name}", value=f"{user.mention}: **{rec['result']}**", inline=False)
+        user = await bot.fetch_user(int(rec['user_id']))
+        embed.add_field(name=f"{idx}. {user.name}", value=f"{user.mention}: **{rec['result']}**", inline=False)
 
     await ctx.send(embed=embed, file=file)
 

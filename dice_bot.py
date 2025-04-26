@@ -148,16 +148,16 @@ async def command_list(ctx):
 
 @bot.command(name='backup')
 async def backup_sheet(ctx):
+    status = await ctx.send("📦 Backup wird erstellt...")
     try:
-        gc = sheet.spreadsheet.client
         original = sheet.spreadsheet
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
         new_title = f"Backup_{original.title}_{timestamp}"
-        gc.copy(original.id, title=new_title)
-        await ctx.send(f"✅ Backup erstellt: `{new_title}`")
+        original.copy(title=new_title)
+        await status.edit(content=f"✅ Backup erstellt: `{new_title}`")
     except Exception as e:
         print("Fehler beim Backup:", e)
-        await ctx.send("⚠️ Backup fehlgeschlagen.")
+        await status.edit(content="⚠️ Backup fehlgeschlagen.")
 
 @tasks.loop(hours=24)
 async def auto_backup():

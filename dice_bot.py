@@ -13,14 +13,14 @@ from google.oauth2.service_account import Credentials
 
 _top_command_lock = asyncio.Lock()
 
-
+# Hilfsfunktion, um Google Sheets Client zu initialisieren
 def init_sheets_client():
     creds_raw = os.environ.get("GOOGLE_SHEETS_CREDENTIALS")
     if not creds_raw:
         raise RuntimeError("GOOGLE_SHEETS_CREDENTIALS fehlt")
 
     creds_json = json.loads(creds_raw)
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
 
     gc = gspread.authorize(creds)
@@ -31,7 +31,6 @@ def init_sheets_client():
     sh = gc.open_by_key(sheet_id)
     sheet = sh.sheet1
 
-    # 🧼 Header prüfen und ggf. setzen
     headers = ["user_id", "username", "datum", "zeitstempel", "wert"]
     current_values = sheet.get_all_values()
     if not current_values or current_values[0] != headers:
@@ -39,7 +38,6 @@ def init_sheets_client():
 
     return sheet
 
-# Bot-Token aus der Umgebungsvariable laden
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 if not TOKEN:
     raise RuntimeError("Fehler: DISCORD_BOT_TOKEN Umgebungsvariable nicht gesetzt")
@@ -150,10 +148,14 @@ async def command_list(ctx):
 async def backup_sheet(ctx):
     status = await ctx.send("📦 Backup wird erstellt...")
     try:
-        original = sheet.spreadsheet
+        creds = Credentials.from_service_account_info(json.loads(os.environ.get("GOOGLE_SHEETS_CREDENTIALS")), scopes=["https://www.googleapis.com/auth/drive"])
+        gc = gspread.authorize(creds)
+        original = gc.open_by_key(os.environ["SHEET_ID"])
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
         new_title = f"Backup_{original.title}_{timestamp}"
-        original.copy(title=new_title)
+        gc.request('post', f'/drive/v3/files/{original.id}/copy', json={
+            'name': new_title
+        })
         await status.edit(content=f"✅ Backup erstellt: `{new_title}`")
     except Exception as e:
         print("Fehler beim Backup:", e)
@@ -164,26 +166,15 @@ async def auto_backup():
     now = datetime.datetime.utcnow()
     if now.day == 1:
         try:
-            gc = sheet.spreadsheet.client
-            original = sheet.spreadsheet
+            creds = Credentials.from_service_account_info(json.loads(os.environ.get("GOOGLE_SHEETS_CREDENTIALS")), scopes=["https://www.googleapis.com/auth/drive"])
+            gc = gspread.authorize(creds)
+            original = gc.open_by_key(os.environ["SHEET_ID"])
             timestamp = now.strftime("%Y-%m-%d")
             new_title = f"AutoBackup_{original.title}_{timestamp}"
-            gc.copy(original.id, title=new_title)
+            gc.request('post', f'/drive/v3/files/{original.id}/copy', json={
+                'name': new_title
+            })
             print(f"🔁 Automatisches Monatsbackup erstellt: {new_title}")
-
-            # 📦 Archiv-Tab erstellen
-            sheet_data = sheet.get_all_values()
-            if len(sheet_data) > 1:
-                archive_title = f"Archiv_{now.strftime('%Y_%m')}"
-                archive_sheet = original.add_worksheet(title=archive_title, rows=str(len(sheet_data)), cols="10")
-                archive_sheet.update("A1", sheet_data)
-                print(f"📁 Archiv-Tab erstellt: {archive_title}")
-
-                # Nur Header behalten
-                header = sheet_data[0]
-                sheet.clear()
-                sheet.insert_row(header, index=1)
-                print("🧼 Haupt-Sheet geleert (nur Header behalten).")
         except Exception as e:
             print("Fehler beim automatischen Backup:", e)
 

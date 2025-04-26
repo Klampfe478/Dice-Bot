@@ -3,3 +3,4 @@ python-dotenv
 gspread
 google-auth
 aiohttp
+google-api-python-client

@@ -123,7 +123,7 @@ async def top(ctx, period: str):
             reverse=True
         )[:10]
 
-        embed = discord.Embed(title=title, color=discord.Color.blurple(), timestamp=now)
+        embed = discord.Embed(title=f"🍜 {title}", color=discord.Color.blurple(), timestamp=now)
         embed.set_footer(text="Dice-Game Leaderboard")
         embed.set_thumbnail(url="attachment://thumbnail.png")
         file = discord.File('thumbnail.png', filename='thumbnail.png')

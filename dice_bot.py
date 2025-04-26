@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands, tasks
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
 
 _top_command_lock = asyncio.Lock()
 
@@ -148,14 +149,21 @@ async def command_list(ctx):
 async def backup_sheet(ctx):
     status = await ctx.send("📦 Backup wird erstellt...")
     try:
-        creds = Credentials.from_service_account_info(json.loads(os.environ.get("GOOGLE_SHEETS_CREDENTIALS")), scopes=["https://www.googleapis.com/auth/drive"])
-        gc = gspread.authorize(creds)
-        original = gc.open_by_key(os.environ["SHEET_ID"])
+        creds = Credentials.from_service_account_info(
+            json.loads(os.environ.get("GOOGLE_SHEETS_CREDENTIALS")),
+            scopes=["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
+        )
+        service = build('drive', 'v3', credentials=creds)
+
+        original_file_id = os.environ["SHEET_ID"]
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d_%H-%M")
-        new_title = f"Backup_{original.title}_{timestamp}"
-        gc.request('post', f'/drive/v3/files/{original.id}/copy', json={
-            'name': new_title
-        })
+        new_title = f"Backup_{timestamp}"
+
+        service.files().copy(
+            fileId=original_file_id,
+            body={"name": new_title}
+        ).execute()
+
         await status.edit(content=f"✅ Backup erstellt: `{new_title}`")
     except Exception as e:
         print("Fehler beim Backup:", e)
@@ -167,13 +175,11 @@ async def auto_backup():
     if now.day == 1:
         try:
             creds = Credentials.from_service_account_info(json.loads(os.environ.get("GOOGLE_SHEETS_CREDENTIALS")), scopes=["https://www.googleapis.com/auth/drive"])
-            gc = gspread.authorize(creds)
-            original = gc.open_by_key(os.environ["SHEET_ID"])
+            service = build('drive', 'v3', credentials=creds)
+            original = os.environ["SHEET_ID"]
             timestamp = now.strftime("%Y-%m-%d")
-            new_title = f"AutoBackup_{original.title}_{timestamp}"
-            gc.request('post', f'/drive/v3/files/{original.id}/copy', json={
-                'name': new_title
-            })
+            new_title = f"AutoBackup_{timestamp}"
+            service.files().copy(fileId=original, body={"name": new_title}).execute()
             print(f"🔁 Automatisches Monatsbackup erstellt: {new_title}")
         except Exception as e:
             print("Fehler beim automatischen Backup:", e)

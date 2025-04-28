@@ -140,8 +140,7 @@ async def command_list(ctx):
         "**🍜 ようこそ Dice no Izakayaへ!**\\n"
         "• `!roll` – サイコロを振る (Würfle dein Glück!)\\n"
         "• `!top today` – 今日のベストロール (Top-Würfe des Tages)\\n"
-        "• `!top all` – 今月のチャンピオン (Top-Würfe des Monats)\\n"
-        "• `!backup` – シートのバックアップ (Backup deines Leaderboards)"
+        "• `!top all` – 今月のチャンピオン (Top-Würfe des Monats)"
     )
     await ctx.send(help_text)
 

@@ -11,6 +11,7 @@ from discord.ext import commands, tasks
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build  # type: ignore
+from zoneinfo import ZoneInfo
 
 # Lock für parallele Sheet- und Command-Aufrufe
 top_command_lock = asyncio.Lock()
@@ -56,7 +57,7 @@ async def on_ready():
 async def roll(ctx):
     async with top_command_lock:
         user_id = str(ctx.author.id)
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
         today = now.date().isoformat()
         try:
             rows = sheet.get_all_values()[1:]
@@ -74,7 +75,7 @@ async def roll(ctx):
 @bot.command(name='top')
 async def top(ctx, period: str):
     async with top_command_lock:
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
         try:
             records = sheet.get_all_records()
         except Exception:
@@ -106,7 +107,7 @@ async def top(ctx, period: str):
 @bot.command(name='daily')
 async def daily(ctx, days: int = 7):
     async with top_command_lock:
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
         try:
             records = sheet.get_all_records()
         except Exception:
@@ -137,7 +138,7 @@ async def command_list(ctx):
 @bot.command(name='backup')
 async def backup_sheet(ctx):
     status=await ctx.send('Backup...')
-    now=datetime.datetime.utcnow()
+    now=datetime.datetime.now(ZoneInfo("Europe/Berlin"))
     try:
         creds=Credentials.from_service_account_info(json.loads(os.environ.get('GOOGLE_SHEETS_CREDENTIALS')), scopes=["https://www.googleapis.com/auth/drive"])
         service=build('drive','v3', credentials=creds)
@@ -152,7 +153,7 @@ async def backup_sheet(ctx):
 
 @tasks.loop(hours=24)
 async def auto_backup():
-    now=datetime.datetime.utcnow()
+    now=datetime.datetime.now(ZoneInfo("Europe/Berlin"))
     if now.day==1:
         creds=Credentials.from_service_account_info(json.loads(os.environ.get('GOOGLE_SHEETS_CREDENTIALS')), scopes=["https://www.googleapis.com/auth/drive"])
         service=build('drive','v3',credentials=creds)

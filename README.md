@@ -9,4 +9,4 @@
 # • !daily 30 - Wer hat wohl die meisten Siege der letzen 30 Tage?
 
 # Möge der Würfel 🍜 dir hold sein – und dein Name im Leaderboard für alle Gäste glänzen! ✨
-# いただきます! ("Itadakimasu" – Lasst uns beginnen!) 
+# ゲームを始めましょう！ ("Gēmu o hajimemashou!" – Lasst das Spiel beginnen!) 

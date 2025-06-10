@@ -50,8 +50,10 @@ bot = commands.Bot(command_prefix='!', intents=tintents)
 
 @bot.event
 async def on_ready():
-    print(f'Bot eingeloggt als {bot.user.name} (ID: {bot.user.id})')
+    print(f'✅ Bot eingeloggt als {bot.user.name} (ID: {bot.user.id})')
     auto_backup.start()
+    asyncio.create_task(start_webserver())  # ← sauber im laufenden Event-Loop
+    print("🌐 Webserver gestartet")
 
 @bot.command(name='roll')
 async def roll(ctx):
@@ -105,7 +107,7 @@ async def top(ctx, period: str):
         await ctx.send(embed=embed, file=file)
 
 @bot.command(name='daily')
-async def daily(ctx, days: int = 7):
+async def daily(ctx, days: int = 30):
     async with top_command_lock:
         now = datetime.datetime.now(ZoneInfo("Europe/Berlin"))
         try:
@@ -132,7 +134,14 @@ async def daily(ctx, days: int = 7):
 
 @bot.command(name='command')
 async def command_list(ctx):
-    text=("**Befehle:**\n""!roll – würfeln""\n!top today – Tages-Bestenliste""\n!top all – Monats-Bestenliste""\n!daily [Tage] – Daily-Champions")
+    text = (
+        "**Befehle:**\n"
+        "`!roll` – würfeln\n"
+        "`!top today` – Tages-Bestenliste\n"
+        "`!top all` – Monats-Bestenliste\n"
+        "`!daily` – Daily-Champions\n"
+        "`!backup` – manuelles Backup"
+    )
     await ctx.send(text)
 
 @bot.command(name='backup')
@@ -179,10 +188,5 @@ async def start_webserver():
 
     print("🌐 Webserver gestartet")  # ← Diese Zeile einfügen
 
-async def main():
-    await asyncio.gather(start_webserver(), bot.start(TOKEN))
-
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.create_task(start_webserver())  # Webserver im Hintergrund starten
-    bot.run(TOKEN)  # startet den Bot synchron, inkl. integriertem reconnect/retry
+    bot.run(TOKEN)

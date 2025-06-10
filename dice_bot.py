@@ -166,12 +166,23 @@ async def auto_backup():
             print('AutoBackup-Fehler', e)
 
 async def start_webserver():
-    async def handle(req): return web.Response(text='OK')
-    app=web.Application(); app.router.add_get('/', handle)
-    runner=web.AppRunner(app); await runner.setup(); await web.TCPSite(runner,'0.0.0.0',int(os.environ.get('PORT',8000))).start()
+    async def handle(req):
+        return web.Response(text='OK')
+
+    app = web.Application()
+    app.router.add_get('/', handle)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get('PORT', 8000)))
+    await site.start()
+
+    print("🌐 Webserver gestartet")  # ← Diese Zeile einfügen
 
 async def main():
     await asyncio.gather(start_webserver(), bot.start(TOKEN))
 
-if __name__=='__main__':
-    asyncio.run(main())
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_webserver())  # Webserver im Hintergrund starten
+    bot.run(TOKEN)  # startet den Bot synchron, inkl. integriertem reconnect/retry
